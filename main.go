@@ -19,6 +19,8 @@ import (
 )
 
 var port = os.Getenv("PORT")
+var address = os.Getenv("ADDRESS")
+var socket = os.Getenv("SOCKET")
 var logGroupName = os.Getenv("LOG_GROUP_NAME")
 var streamName = uuid.NewV4().String()
 var sequenceToken = ""
@@ -42,7 +44,10 @@ func main() {
 		port = "5014"
 	}
 
-	address := fmt.Sprintf("127.0.0.1:%v", port)
+	if socket == "" {
+		socket = "/var/run/bridge.sock"
+	}
+
 	log.Println("Starting syslog server on", address)
 	log.Println("Logging to group:", logGroupName)
 	initCloudWatchStream()
@@ -53,9 +58,11 @@ func main() {
 	server := syslog.NewServer()
 	server.SetFormat(syslog.Automatic)
 	server.SetHandler(handler)
-	server.ListenUDP(address)
-	server.ListenTCP(address)
-
+	if address != "" {
+		server.ListenUDP(fmt.Sprintf("%v:%v", address, port))
+		server.ListenTCP(fmt.Sprintf("%v:%v", address, port))
+	}
+	server.ListenUnixgram(socket)
 	server.Boot()
 
 	go func(channel syslog.LogPartsChannel) {
